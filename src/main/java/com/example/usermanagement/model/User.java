@@ -82,9 +82,14 @@ public class User {
     public void setAge(Integer age) {
         this.age = age;
     }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 
     @PrePersist
     public void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
 }

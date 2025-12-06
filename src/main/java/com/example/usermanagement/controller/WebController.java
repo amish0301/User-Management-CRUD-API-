@@ -18,13 +18,14 @@ public class WebController {
     @GetMapping("/")
     public String home(Model model) {
         List<User> users = userService.getAllUsers();
+        System.err.println("Users : " + users);
 
         int totalUsers = users.size();
         double avgAge = users.isEmpty() ? 0 : users.stream().mapToInt(User::getAge).average().orElse(0);
 
         model.addAttribute("totalUsers", totalUsers);
-        model.addAttribute("totalUsers", totalUsers);
         model.addAttribute("avgAge", String.format("%.0f", avgAge));
+        model.addAttribute("users", users);
 
         return "users";
     }
