@@ -21,18 +21,26 @@ public class AuthJwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private Long expiration;
+    @Value("${jwt.access-token-expiration}")
+    private Long accessTokenExpiration;
 
-    public String generateToken(UserDetails ud) {
+    @Value("${jwt.refresh-token-expiration}")
+    private Long refreshTokenExpiration;
+
+    public String generateAccessToken(UserDetails ud) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, ud.getUsername());
+        return createToken(claims, ud.getUsername(), accessTokenExpiration);
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    public String generateRefreshToken(UserDetails ud) {
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, ud.getUsername(), refreshTokenExpiration);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, Long expiration) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
-        return Jwts.builder().claims(claims).subject(subject).issuedAt(now).expiration(expiryDate).compact();
+        return Jwts.builder().claims(claims).subject(subject).issuedAt(now).expiration(expiryDate).signWith(getSignKey()).compact();
     }
 
     private SecretKey getSignKey() {
@@ -64,5 +72,12 @@ public class AuthJwtUtil {
     public Boolean validateToken(String token, UserDetails ud) {
         final String username = extractUserName(token);
         return (username.equals(ud.getUsername()) && !isTokenExpired(token));
+    }
+
+    public Boolean isAccessToken(String token) {
+        Date expiration = extractExpiration(token);
+        Date issuedAt = extractClaim(token, Claims::getIssuedAt);
+        long tokenLifeSpan = expiration.getTime() - issuedAt.getTime();
+        return Math.abs(tokenLifeSpan - accessTokenExpiration) < 1000;
     }
 }

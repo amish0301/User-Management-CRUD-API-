@@ -11,7 +11,9 @@ import com.example.usermanagement.Enum.Role;
 import com.example.usermanagement.dto.UserRequestDTO;
 import com.example.usermanagement.dto.auth.AuthRequest;
 import com.example.usermanagement.dto.auth.AuthResponse;
+import com.example.usermanagement.dto.auth.RefreshTokenRequest;
 import com.example.usermanagement.exception.DuplicateEmailException;
+import com.example.usermanagement.exception.UserNotFoundException;
 import com.example.usermanagement.model.User;
 import com.example.usermanagement.repository.UserRepository;
 import com.example.usermanagement.security.AuthJwtUtil;
@@ -37,8 +39,8 @@ public class AuthService {
         User user = new User(request.getName(), request.getEmail(), request.getAge(),
                 passwordEncoder.encode(request.getPassword()), Role.USER);
         userRepo.save(user);
-        String token = jwtUtil.generateToken(user);
-        return new AuthResponse(token, user.getEmail(), user.getRole().name());
+
+        return new AuthResponse(null, null, user.getEmail(), user.getRole().name());
     }
 
     public AuthResponse login(AuthRequest reequest) {
@@ -46,9 +48,34 @@ public class AuthService {
 
         UserDetails user = userRepo.findByEmail(reequest.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        String token = jwtUtil.generateToken(user);
+        String accessToken = jwtUtil.generateAccessToken(user);
+        String refreshToken = jwtUtil.generateRefreshToken(user);
 
-        return new AuthResponse(token, user.getUsername(), user.getAuthorities().iterator().next().getAuthority());
+        return new AuthResponse(accessToken, refreshToken, user.getUsername(),
+                user.getAuthorities().iterator().next().getAuthority());
     }
 
+    // refresh token
+    public AuthResponse refreshToken(RefreshTokenRequest req) {
+        String refreshToken = req.getRefreshToken();
+
+        try {
+            String email = jwtUtil.extractUserName(refreshToken);
+            User user = userRepo.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+
+            // validate refresh token
+            if (!jwtUtil.validateToken(refreshToken, user)) {
+                throw new RuntimeException("Invalid Refresh Token");
+            }
+
+            String newAccessToken = jwtUtil.generateAccessToken(user);
+            return new AuthResponse(newAccessToken, refreshToken, user.getEmail(), user.getRole().name());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to refresh token: " + e.getMessage());
+        }
+    }
+
+    public void logout(String email) {
+        userRepo.findByEmail(email).ifPresent(user -> userRepo.delete(user));
+    }
 }
